@@ -690,6 +690,19 @@ scheduled to run after the stepper move completes, however if a manual
 stepper move uses SYNC=0 then future G-Code movement commands may run
 in parallel with the stepper movement.
 
+### [mcp47cxb1x]
+
+The following command is available when an
+[mcp47cxb1x config section](Config_Reference.md#mcp47cxb1x) is
+enabled.
+
+#### SET_DAC
+`SET_DAC DAC=config_name CHANNEL=<channel> VALUE=<value>`:
+This sets the output of the given DAC Channel.
+`<value>` must be between 0.0 and 1.0 unless the `SCALE` parameter 
+was set in the config file. Then `<value>` must be between 0.0 
+and the value set for the `SCALE` parameter in the config file.
+
 ### [led]
 
 The following command is available when any of the
