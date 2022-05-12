@@ -3360,8 +3360,8 @@ wiper:
 
 Run-time configurable MCP47CxB1x digital-to-analog converter connected
 via I2C bus (one may define any number of sections with an "MCP47CxB1x"
-prefix). MCP47CxB1x DACs configured here can be controlled during 
-run-time using the SET_DAC [g-code command](G-Codes.md#mcp47cxb1x). 
+prefix). MCP47CxB1x DACs configured here can be controlled during
+run-time using the SET_DAC [g-code command](G-Codes.md#mcp47cxb1x).
 For example: SET_DAC DAC=my_dac CHANNEL=1 VALUE=0.42
 
 ```
@@ -3375,22 +3375,22 @@ For example: SET_DAC DAC=my_dac CHANNEL=1 VALUE=0.42
 #   See the "common I2C settings" section for a description of the
 #   above parameters.
 #channel_count:
-#	The number of DAC Channels the MCP47CxB1x supports. Can be 1 or 2.
-#	This should be the last digit in the part number (MCP47CxB1*x*).
-#	The default is 1 (For MCP47CxB11 DACs)
+#   The number of DAC Channels the MCP47CxB1x supports. Can be 1 or 2.
+#   This should be the last digit in the part number (MCP47CxB1*x*).
+#   The default is 1 (For MCP47CxB11 DACs)
 #channel_1:
 #channel_2:
-#   The value to initially set the given MCP47CxB1x channel to. 
+#   The value to initially set the given MCP47CxB1x channel to.
 #   This is typically set to a number between 0.0 and 1.0
-#   with 1.0 being the highest voltage (4.99V) and 0.0 being the 
-#   lowest voltage. However, the range may be changed with the 
+#   with 1.0 being the highest voltage (4.99V) and 0.0 being the
+#   lowest voltage. However, the range may be changed with the
 #   'scale' parameter (see below). The default is 0.0.
 #scale:
 #   This parameter can be used to alter how the 'channel_x' parameters
 #   are interpreted. If provided, then the 'channel_x' parameters
 #   should be between 0.0 and 'scale'. This may be useful when the
-#   MCP47CxB1x is used to set stepper voltage references. 
-#   The 'scale' can be set to the equivalent stepper amperage 
+#   MCP47CxB1x is used to set stepper voltage references.
+#   The 'scale' can be set to the equivalent stepper amperage
 #   if the MCP47CxB1x were at its highest voltage (4.998V),
 #   and then the 'channel_x' parameters can be specified using the
 #   desired amperage value for the stepper.
