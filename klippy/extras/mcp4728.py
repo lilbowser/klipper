@@ -11,8 +11,8 @@ BACKGROUND_PRIORITY_CLOCK = 0x7fffffff00000000
 class mcp4728:
     def __init__(self, config):
         self.channel_count = 4
-        self.mcu = self.i2c.get_mcu()
         self.i2c = bus.MCU_I2C_from_config(config, default_addr=0x60)
+        self.mcu = self.i2c.get_mcu()
         self.scale = config.getfloat('scale', 1., above=0.)
         self.last_values = [0.] * self.channel_count
         PrinterSetDACCommandHelper(config, self)
