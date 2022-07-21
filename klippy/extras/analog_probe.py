@@ -30,7 +30,7 @@ class AnalogProbe:
         self.lower_speed = config.getfloat('lower_speed', above=0.)
 
         self.dwell_time = config.getfloat('dwell_time', 0.5, minval=0.)
-        self.trigger_point = config.getfloat('trigger_point', 0.5, minval=0.)
+        # self.trigger_point = config.getfloat('trigger_point', 0.5, minval=0.)
         
         self.min_voltage = config.getfloat('min_voltage', 0, minval=0.)
         self.max_voltage = config.getfloat('max_voltage', 5, minval=0.)
@@ -38,7 +38,7 @@ class AnalogProbe:
         self.measure_range_start = config.getfloat('measure_range_start', 20, minval=0.)  # mm
         self.measure_range_end = config.getfloat('measure_range_end', 30, above=self.measure_range_start)  # mm
 
-        self.measurement_height = config.getfloat('measurement_height', 10, minval=0.)  # mm
+        # self.measurement_height = config.getfloat('measurement_height', 10, minval=0.)  # mm
 
         ppins = self.printer.lookup_object('pins')
         self.mcu_adc = ppins.setup_pin('adc', config.get('sensor_pin'))
