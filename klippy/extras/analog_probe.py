@@ -131,8 +131,8 @@ class AnalogProbe:
         
     def _convert_adc_reading(self, adc_reading):
 
-        adc_range_start = self.max_voltage/self.ref_voltage
-        adc_range_end = self.min_voltage/self.ref_voltage
+        adc_range_start = self.min_voltage/self.ref_voltage
+        adc_range_end = self.max_voltage/self.ref_voltage
         measured_voltage = (adc_reading - adc_range_start) / (adc_range_end - adc_range_start)
         measurment_range = self.measure_range_end - self.measure_range_start
         return measured_voltage * measurment_range
