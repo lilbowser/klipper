@@ -37,7 +37,9 @@ class AnalogProbe:
         # self.trigger_point = config.getfloat('trigger_point', 0.5, minval=0.)
         
         self.min_voltage = config.getfloat('min_voltage', 0., minval=0.)
-        self.max_voltage = config.getfloat('max_voltage', 5., minval=0.)
+        self.max_voltage = config.getfloat('max_voltage', 3.3, minval=0.)
+        self.ref_voltage = config.getfloat('ref_voltage', 3.3, minval=0.)
+
 
         self.measure_range_start = config.getfloat('measure_range_start', 20., minval=0.)  # mm
         self.measure_range_end = config.getfloat('measure_range_end', 30., above=self.measure_range_start)  # mm
@@ -110,10 +112,13 @@ class AnalogProbe:
 
         if self.dwell_time:
             self.toolhead.dwell(self.dwell_time)
-
+        
         rel_z = self._get_rel_mesurement(gcmd)
-        if rel_z >= self.measure_range_end*0.95 or rel_z <= self.measure_range_start*0.05:
-            raise gcmd.error("Could not bring Analog Probe into range. Check your configuration and wiring.")
+
+        rel_measure_range_end = (self.measure_range_end - self.measure_range_start)
+        if rel_z >= rel_measure_range_end*0.95 or rel_z <= rel_measure_range_end*0.05:
+            raise gcmd.error("Analog Probe is not in mesurement range. adc=%.6f, rel_z=%.6f" % (self._last_raw_adc_value, rel_z))
+
         abs_dist_from_bed_to_nozzle = rel_z + self.measure_range_start + self.z_offset
         gcmd.respond_info("Result is z=%.6f" % (abs_dist_from_bed_to_nozzle,))
         self._last_z_result = abs_dist_from_bed_to_nozzle
@@ -125,9 +130,12 @@ class AnalogProbe:
         return tip_pos_z
         
     def _convert_adc_reading(self, adc_reading):
-        measure_range = self.measure_range_end - self.measure_range_start
-        voltage_range = self.max_voltage - self.min_voltage
-        return (measure_range / voltage_range)*adc_reading
+
+        adc_range_start = self.max_voltage/self.ref_voltage
+        adc_range_end = self.min_voltage/self.ref_voltage
+        measured_voltage = (adc_reading - adc_range_start) / (adc_range_end - adc_range_start)
+        measurment_range = self.measure_range_end - self.measure_range_start
+        return measured_voltage * measurment_range
 
     def _adc_callback(self, time, value):
         # convert to physical unit
@@ -177,7 +185,8 @@ class AnalogProbe:
         # Get raw probe reading
         raw_adc_value = self._last_raw_adc_value
 
-        if rel_z >= self.measure_range_end*0.95 or rel_z <= self.measure_range_start*0.05:
+        rel_measure_range_end = (self.measure_range_end - self.measure_range_start)
+        if rel_z >= rel_measure_range_end*0.95 or rel_z <= rel_measure_range_end*0.05:
             raise gcmd.error("Analog Probe is not in mesurement range. adc=%.6f, rel_z=%.6f" % (raw_adc_value, rel_z))
 
         abs_dist_from_bed_to_nozzle = rel_z + self.measure_range_start + self.z_offset
