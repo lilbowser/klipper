@@ -17,56 +17,66 @@ RANGE_CHECK_COUNT = 4
 class AnalogProbe:
 
     def __init__(self, config):
-        # logging.info("initing")
-
         self.printer = config.get_printer()
-        self.gcode = self.printer.lookup_object('gcode')  # VERIFY
+        self.reactor = self.printer.get_reactor()
 
+        # printer objects
+        self.gcode = self.toolhead = self.mcu_adc = None
+        self.printer.register_event_handler("klippy:ready", self.handle_ready)
+
+        #Load Config
         self.x_offset = config.getfloat('x_offset', 0.)
         self.y_offset = config.getfloat('y_offset', 0.)
         self.z_offset = config.getfloat('z_offset')         # Physical offset from nozzle to bottom of laser device. Not mesurement range.
                                                             # + is above nozzle, - is below nozzle.
         # logging.info("Got offsets")
         self.lower_speed = config.getfloat('lower_speed', above=0.)
+        self.lift_speed = config.getfloat('lift_speed', above=0.)
 
         self.dwell_time = config.getfloat('dwell_time', 0.5, minval=0.)
         # self.trigger_point = config.getfloat('trigger_point', 0.5, minval=0.)
         
-        self.min_voltage = config.getfloat('min_voltage', 0, minval=0.)
-        self.max_voltage = config.getfloat('max_voltage', 5, minval=0.)
+        self.min_voltage = config.getfloat('min_voltage', 0., minval=0.)
+        self.max_voltage = config.getfloat('max_voltage', 5., minval=0.)
 
-        self.measure_range_start = config.getfloat('measure_range_start', 20, minval=0.)  # mm
-        self.measure_range_end = config.getfloat('measure_range_end', 30, above=self.measure_range_start)  # mm
+        self.measure_range_start = config.getfloat('measure_range_start', 20., minval=0.)  # mm
+        self.measure_range_end = config.getfloat('measure_range_end', 30., above=self.measure_range_start)  # mm
 
         # self.measurement_height = config.getfloat('measurement_height', 10, minval=0.)  # mm
 
+        #Start ADC
         ppins = self.printer.lookup_object('pins')
         self.mcu_adc = ppins.setup_pin('adc', config.get('sensor_pin'))
 
-        self.mcu_adc.setup_minmax(SAMPLE_TIME, SAMPLE_COUNT,
-                                  minval=self.min_voltage, maxval=self.max_voltage,
-                                  range_check_count=RANGE_CHECK_COUNT)
+        self.mcu_adc.setup_minmax(SAMPLE_TIME, SAMPLE_COUNT)
+                                #   minval=0., maxval=5.,
+                                #   range_check_count=RANGE_CHECK_COUNT)
         self.mcu_adc.setup_adc_callback(REPORT_TIME, self._adc_callback)
 
         # register gcode commands
-        self._gcode = self.printer.lookup_object('gcode')
-        self._gcode.register_command('PROBE', self.cmd_PROBE,
+        self.gcode = self.printer.lookup_object('gcode')
+        self.gcode.register_command('PROBE', self.cmd_PROBE,
                                     desc=self.cmd_PROBE_help)
-        # self._gcode.register_command('QUERY_PROBE', self.cmd_PROBE, desc=self.cmd_PROBE_help)
-        self._last_measurement_time = 0
-        self._last_measurement_value = 0
-        self._last_z_result = 0
+        # self.gcode.register_command('QUERY_PROBE', self.cmd_PROBE, desc=self.cmd_PROBE_help)
+        
+        self.gcode.register_command('DEBUG_PROBE', self.cmd_DEBUG_PROBE,
+                                    desc=self.cmd_DEBUG_PROBE_help)
+        self._last_measurement_time = 0.
+        self._last_measurement_value = 0.
+        self._last_z_result = 0.
+        self._last_raw_adc_value = 0.
 
     cmd_PROBE_help = "Run probe and stop at the contact position."
+    cmd_DEBUG_PROBE_help = "Displays debug info from the probe at the current toolhead position."
+
+
+    # Initialization
+    def handle_ready(self):
+        # Load printer objects
+        self.toolhead = self.printer.lookup_object('toolhead')
 
     def get_lift_speed(self, gcmd=None):
-        # Z Up speed between samples
-
-        # NOT APPLICABLE DO WE ACTUALLY NEED?
-
-        # if gcmd is not None:
-        #     return gcmd.get_float("LIFT_SPEED", SPEED, above=0.)
-        return 0.1
+        return self.lift_speed
     
 
     def get_offsets(self):
@@ -90,20 +100,18 @@ class AnalogProbe:
 
     def run_probe(self, gcmd):
 
-        toolhead = self.printer.lookup_object('toolhead')
-
         # wait until toolhead is in position
-        toolhead.wait_moves()
+        self.toolhead.wait_moves()
 
         # move into measurment range
-        pos = self.tool.get_position()
-        toolhead.manual_move([pos[0],pos[1],self._get_ideal_measurement_height()], self.lower_speed)
-        toolhead.wait_moves()
+        pos = self.toolhead.get_position()
+        self.toolhead.manual_move([pos[0],pos[1],self._get_ideal_measurement_height()], self.lower_speed)
+        self.toolhead.wait_moves()
 
         if self.dwell_time:
-            toolhead.dwell(self.dwell_time)
+            self.toolhead.dwell(self.dwell_time)
 
-        rel_z = self._get_rel_mesurement()
+        rel_z = self._get_rel_mesurement(gcmd)
         if rel_z >= self.measure_range_end*0.95 or rel_z <= self.measure_range_start*0.05:
             raise gcmd.error("Could not bring Analog Probe into range. Check your configuration and wiring.")
         abs_dist_from_bed_to_nozzle = rel_z + self.measure_range_start + self.z_offset
@@ -125,8 +133,8 @@ class AnalogProbe:
         # convert to physical unit
         self._last_measurement_value = self._convert_adc_reading(value)
         self._last_measurement_time = time
-        # Store zero offset compensated value for display
-        self._last_force = self._last_uncompensated_force - self._force_offset
+        # store raw adc value for debuging
+        self._last_raw_adc_value = value
 
     def _get_rel_mesurement(self, gcmd):
         # read ADC sample
@@ -140,7 +148,7 @@ class AnalogProbe:
         last_sys_time = clocksync.estimate_clock_systime(clock)
         for n in range(1,10):
           # wait shortly after the timer has called _sample_timer
-          self._reactor.pause(last_sys_time + n*REPORT_TIME + 0.0001)
+          self.reactor.pause(last_sys_time + n*REPORT_TIME + 0.0001)
           if self._last_measurement_time != last_time:
             return
 
@@ -148,14 +156,35 @@ class AnalogProbe:
         raise gcmd.error("Timeout waiting for ADC value.")
 
     def cmd_PROBE(self, gcmd):
-        pos = self.tool.get_position()
+        pos = self.toolhead.get_position()
 
         gcmd.respond_info("PROBE at X:%.3f Y:%.3f Z:%.3f\n"
                           % (pos[0], pos[1], pos[2]))
 
         pos = self.run_probe(gcmd)
-        self.tool.manual_move([pos[0],pos[1],pos[2]], self.lower_speed)
-        self.tool.wait_moves()
+        self.toolhead.manual_move([pos[0],pos[1],pos[2]], self.lower_speed)
+        self.toolhead.wait_moves()
+
+
+    def cmd_DEBUG_PROBE(self, gcmd):
+        pos = self.toolhead.get_position()
+
+        gcmd.respond_info("Toolhead at X:%.3f Y:%.3f Z:%.3f\n"
+                          % (pos[0], pos[1], pos[2]))
+
+        # Get relative probe mesurement
+        rel_z = self._get_rel_mesurement(gcmd)
+        # Get raw probe reading
+        raw_adc_value = self._last_raw_adc_value
+
+        if rel_z >= self.measure_range_end*0.95 or rel_z <= self.measure_range_start*0.05:
+            raise gcmd.error("Analog Probe is not in mesurement range. adc=%.6f, rel_z=%.6f" % (raw_adc_value, rel_z))
+
+        abs_dist_from_bed_to_nozzle = rel_z + self.measure_range_start + self.z_offset
+        gcmd.respond_info("Result is abs Z=%.6f, rel_z=%.6f, adc=%.6f" % (abs_dist_from_bed_to_nozzle, rel_z, raw_adc_value))
+        self._last_z_result = abs_dist_from_bed_to_nozzle
+
+
 
 def load_config(config):
     probe = AnalogProbe(config)
