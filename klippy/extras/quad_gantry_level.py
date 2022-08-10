@@ -29,6 +29,7 @@ class QuadGantryLevel:
             "Possibly Z motor numbering is wrong")
         self.max_adjust = config.getfloat("max_adjust", 4, above=0)
         self.horizontal_move_z = config.getfloat("horizontal_move_z", 5.0)
+        self.upper_z_plane = config.getfloat("upper_z_plane", None)
         self.probe_helper = probe.ProbePointsHelper(config, self.probe_finalize)
         if len(self.probe_helper.probe_points) != 4:
             raise config.error(
@@ -54,7 +55,8 @@ class QuadGantryLevel:
     def probe_finalize(self, offsets, positions):
         # Mirror our perspective so the adjustments make sense
         # from the perspective of the gantry
-        z_positions = [self.horizontal_move_z - p[2] for p in positions]
+        mirror_plane = self.upper_z_plane if self.upper_z_plane is not None else self.horizontal_move_z
+        z_positions = [mirror_plane - p[2] for p in positions]
         points_message = "Gantry-relative probe points:\n%s\n" % (
             " ".join(["%s: %.6f" % (z_id, z_positions[z_id])
                 for z_id in range(len(z_positions))]))
