@@ -65,7 +65,7 @@ class mcp47cxb1x:
     def get_status(self, eventtime):
         return {
             'scale': self.scale,
-            'values': self.last_values
+            'values': tuple(self.last_values)
             }
 
 def load_config_prefix(config):
